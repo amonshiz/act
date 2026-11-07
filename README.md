@@ -23,6 +23,16 @@ Let's see it in action with a [sample repo](https://github.com/cplee/github-acti
 
 ![Demo](docs/img/act-quickstart.gif)
 
+## macOS jobs
+
+On an Apple Silicon Mac, act can run `macos-*` jobs in throwaway macOS VMs managed by [Tart](https://tart.run) instead of Docker containers:
+
+```sh
+act -P macos-26=tart://ghcr.io/cirruslabs/macos-tahoe-xcode:latest
+```
+
+See [macOS jobs with Tart](docs/tart.md).
+
 # Act User Guide
 
 Please look at the [act user guide](https://nektosact.com) for more documentation.

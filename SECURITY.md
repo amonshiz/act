@@ -27,6 +27,14 @@ credentials. Only run workflows and actions that you trust. Self-hosted mode
 (`-P <label>=-self-hosted`) runs steps directly on the host, without a container
 boundary.
 
+Tart platforms (`-P <label>=tart://<image>`) run each job in a throwaway macOS
+VM. The VM cannot see the host filesystem except the per-job directories act
+shares with it (and the project directory with `--bind`), which the job can
+write. Under Tart's default NAT network the VM can reach the host's local
+network; use `?softnet=1` for workflows you do not trust. act does not check
+the VM's SSH host key, because the VM is created by act for the job on a
+host-local network and its key is new on every clone.
+
 ## Verifying downloads
 
 New release archives and their `checksums.txt` carry signed build provenance.

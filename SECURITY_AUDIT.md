@@ -85,6 +85,7 @@ Severity is the reporter's unless noted. Status is relative to `main` before thi
 | Default project files through symlinks | Skipped when they resolve outside the workdir | Pass the path explicitly (`--secret-file /path`) | Repos that symlink `.secrets` elsewhere |
 | `pkg/common.ParseAuthorizationToken` | Removed | Use `ParseSignedAuthorizationToken` | Library consumers |
 | GitHub remote regex | Exact host match | None | Remotes on `www.github.com` |
+| Tart platforms (`tart://`) | VM per job, deleted at job end (also on cancel); only per-job directories shared; default NAT; SSH password from a flag or `ACT_TART_SSH_PASSWORD`, never from a project `.actrc` | `?softnet=1` for network isolation; `--tart-keep-failed` keeps a failed job's VM | Users of the new Tart backend |
 
 A stricter future default: stop mounting the Docker socket into job containers unless requested. That would let `auto` restrict by default. It breaks Docker-in-Docker workflows, so it needs a release note and a flag.
 
@@ -116,4 +117,5 @@ Owner-only settings:
 - `validateRunIDV4` keeps its commented-out check; the middleware binds the run id instead.
 - x/crypto openpgp (GO-2026-5932) has no fixed release and is not called.
 - gosec G115 findings in the copied Docker CLI code were not changed.
+- Tart VMs are isolated from the host filesystem except the shared job directories (`act/`, `work/`, `tmp/`, and the project directory with `--bind`), which the job can write. Under the default NAT network the VM reaches the host's LAN, including act's artifact and cache servers. The SSH host key is not checked: the VM is created by act on a host-local network and gets a new key on every clone. Launcher scripts that carry step environment (including secrets) are written 0600 to the shared `act/run/` directory and removed when the step ends.
 - Docker-backed integration tests (`TestRunEvent` and related) were not run in this environment; there is no Docker daemon. Run `make test` before release.

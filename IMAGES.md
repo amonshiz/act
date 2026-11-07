@@ -40,6 +40,18 @@
 | [`catthehacker/ubuntu:full-20.04`][ghcr/catthehacker/ubuntu]  | [`catthehacker/virtual-environments-fork`][gh/catthehacker/virtual-environments-fork] |
 | [`catthehacker/ubuntu:full-18.04`][ghcr/catthehacker/ubuntu]  | [`catthehacker/virtual-environments-fork`][gh/catthehacker/virtual-environments-fork] |
 
+## macOS VM images for Tart
+
+These run with `-P <label>=tart://<image>` on an Apple Silicon Mac; see [macOS jobs with Tart](docs/tart.md). They are Tart VM images, not Docker images, and are large.
+
+| Image                                           | Notes                                                      |
+| ----------------------------------------------- | ---------------------------------------------------------- |
+| `ghcr.io/cirruslabs/macos-tahoe-xcode:latest`   | macOS 26 with Xcode, Homebrew and Node.js. Tested with act |
+| `ghcr.io/cirruslabs/macos-tahoe-base:latest`    | macOS 26 without Xcode                                     |
+| `ghcr.io/cirruslabs/macos-sequoia-xcode:latest` | macOS 15 with Xcode                                        |
+
+JavaScript actions need `node` in the image; act warns at setup when it is missing. The Cirrus Labs images use SSH user `admin` with password `admin`, act's defaults.
+
 Feel free to make a pull request with your image added here
 
 [hub/_/buildpack-deps]: https://hub.docker.com/_/buildpack-deps

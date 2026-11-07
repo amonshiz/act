@@ -4,6 +4,63 @@ act can run a job in a throwaway macOS virtual machine instead of a Docker conta
 
 Use it for jobs that need macOS: Xcode builds, Swift packages, Homebrew, or anything that targets `runs-on: macos-*` on GitHub.
 
+## Getting started
+
+These steps take you from a fresh Apple Silicon Mac to a job running in a VM. See [Requirements](#requirements) for details.
+
+1. Install Tart and check it runs:
+
+   ```sh
+   brew install openai/tools/tart
+   tart --version
+   ```
+
+2. Download a macOS image once. This one is about 83 GB, so it takes a while; later jobs start from the local copy in under a minute.
+
+   ```sh
+   tart pull ghcr.io/cirruslabs/macos-tahoe-xcode:latest
+   ```
+
+3. Map a `runs-on` label to the image. Add this line to `~/.actrc` so you don't have to repeat it:
+
+   ```text
+   -P macos-26=tart://ghcr.io/cirruslabs/macos-tahoe-xcode:latest
+   ```
+
+4. Add a workflow with a macOS job to your repository, for example `.github/workflows/macos.yml`:
+
+   ```yaml
+   name: macos
+   on: push
+   jobs:
+     hello:
+       runs-on: macos-26
+       steps:
+         - uses: actions/checkout@v4
+         - run: sw_vers && uname -m
+         - run: echo "$RUNNER_OS $RUNNER_ARCH $ImageOS"
+         - run: xcodebuild -version
+   ```
+
+5. Run it from the repository's root:
+
+   ```sh
+   act push -W .github/workflows/macos.yml
+   ```
+
+   A successful run logs `tart clone ...`, then `VM act-macos-hello-... is ready (macOS 26.x, arm64)`, then the step output (`macOS ARM64 macos26` for the second step), and ends with `Job succeeded`.
+
+6. Check that nothing was left behind. `tart list --source local` should show no `act-` VMs once the job has finished.
+
+### First-run problems
+
+- **`Couldn't get a valid docker connection` and an "Apple M-series chip" warning.** act prints these at startup when Docker isn't running. They don't affect Tart jobs, so you can ignore them.
+- **`authentication required: Invalid username or token` when cloning an action.** act passes your GitHub token when it clones remote actions such as `actions/setup-node`. Without `-s GITHUB_TOKEN=...`, it asks the GitHub CLI (`gh auth token`), and a stale `gh` login gives it an invalid token. Run `gh auth login` again, or pass `-s GITHUB_TOKEN=` to clone public actions anonymously.
+- **`tart was not found on PATH`.** Install Tart (step 1), or check that Homebrew's `bin` directory is on your `PATH`.
+- **`tart platforms need macOS on Apple Silicon`.** Tart VMs run only on Apple Silicon Macs.
+- **`cannot connect to the VM over SSH`.** The image needs Remote Login enabled and the user and password act uses (`admin`/`admin` by default). Pass `--tart-ssh-user` and `--tart-ssh-password` (or `--tart-ssh-key`) for other images.
+- **A job that waits with `Waiting for a free Tart VM slot`.** Only two macOS VMs can run at once. The job starts when another one finishes; see [Limits](#limits).
+
 ## Requirements
 
 - A Mac with Apple Silicon running macOS 13 (Ventura) or newer. Tart needs it for directory sharing.

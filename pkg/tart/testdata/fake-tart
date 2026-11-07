@@ -1,0 +1,86 @@
+#!/bin/sh
+# fake-tart emulates the tart CLI for tests.
+#
+#   FAKE_TART_STATE  directory for VM state and argv.log (required)
+#   FAKE_TART_MOUNT  directory where `run` links each --dir share by name
+#   FAKE_TART_FAIL   subcommand that should fail (exit 1)
+#   FAKE_TART_IP     address printed by `ip` (default 127.0.0.1)
+#   FAKE_TART_RUN_EXIT  when set, `run` exits right away with status 1
+set -u
+state=${FAKE_TART_STATE:?FAKE_TART_STATE is not set}
+mkdir -p "$state/vms"
+printf '%s\n' "$*" >> "$state/argv.log"
+
+sub=${1:-}
+[ $# -gt 0 ] && shift
+
+if [ "${FAKE_TART_FAIL:-}" = "$sub" ]; then
+	echo "fake-tart: $sub failed" >&2
+	echo "second line" >&2
+	exit 1
+fi
+
+setstate() { mkdir -p "$state/vms/$1"; echo "$2" > "$state/vms/$1/state"; }
+
+case "$sub" in
+clone)
+	[ -d "$state/vms/$2" ] && { echo "VM $2 already exists" >&2; exit 1; }
+	setstate "$2" stopped
+	;;
+pull | set) ;;
+run)
+	name=
+	while [ $# -gt 0 ]; do
+		case "$1" in
+		--dir)
+			shift
+			n=${1%%:*}; rest=${1#*:}; p=${rest%%:*}
+			ln -sfn "$p" "${FAKE_TART_MOUNT:?}/$n"
+			;;
+		--dir=*)
+			v=${1#--dir=}; n=${v%%:*}; rest=${v#*:}; p=${rest%%:*}
+			ln -sfn "$p" "${FAKE_TART_MOUNT:?}/$n"
+			;;
+		-*) ;;
+		*) name=$1 ;;
+		esac
+		shift
+	done
+	[ -d "$state/vms/$name" ] || { echo "VM $name does not exist" >&2; exit 1; }
+	[ -n "${FAKE_TART_RUN_EXIT:-}" ] && { echo "boot failed" >&2; exit 1; }
+	setstate "$name" running
+	echo $$ > "$state/vms/$name/pid"
+	trap 'setstate "$name" stopped; rm -f "$state/vms/$name/pid"; exit 0' INT TERM
+	while :; do sleep 1 & wait $!; done
+	;;
+ip)
+	echo "${FAKE_TART_IP:-127.0.0.1}"
+	;;
+stop)
+	if [ -f "$state/vms/$1/pid" ]; then kill -INT "$(cat "$state/vms/$1/pid")" 2>/dev/null; fi
+	if [ -d "$state/vms/$1" ]; then setstate "$1" stopped; fi
+	;;
+delete)
+	for n in "$@"; do rm -rf "$state/vms/$n"; done
+	;;
+list)
+	sep=
+	printf '['
+	for d in "$state"/vms/*; do
+		[ -d "$d" ] || continue
+		n=$(basename "$d"); s=$(cat "$d/state")
+		r=false; [ "$s" = running ] && r=true
+		printf '%s{"Name":"%s","State":"%s","Running":%s,"Source":"local"}' "$sep" "$n" "$s" "$r"
+		sep=,
+	done
+	printf ']\n'
+	;;
+exec)
+	shift
+	exec "$@"
+	;;
+*)
+	echo "fake-tart: unknown command $sub" >&2
+	exit 64
+	;;
+esac

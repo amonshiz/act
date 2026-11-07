@@ -40,8 +40,10 @@ type Environment struct {
 	// ExecWithCmdLine) are promoted onto Environment.
 	files *container.HostEnvironment
 
-	mu     sync.Mutex
-	stdout io.Writer
+	mu        sync.Mutex
+	stdout    io.Writer
+	transport transport
+	loginEnv  map[string]string
 }
 
 // New validates the platform and returns an Environment that is not started.
@@ -153,9 +155,6 @@ var errNotImplemented = errors.New("tart: not implemented yet")
 func (e *Environment) Pull(bool) common.Executor                 { return errorExecutor(nil) }
 func (e *Environment) Create([]string, []string) common.Executor { return errorExecutor(nil) }
 func (e *Environment) Start(bool) common.Executor                { return errorExecutor(errNotImplemented) }
-func (e *Environment) Exec([]string, map[string]string, string, string) common.Executor {
-	return errorExecutor(errNotImplemented)
-}
 func (e *Environment) ExecWithCmdLine(command []string, _ string, env map[string]string, user, workdir string) common.Executor {
 	return e.Exec(command, env, user, workdir)
 }

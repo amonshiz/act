@@ -41,6 +41,7 @@ require (
 	github.com/moby/go-archive v0.3.0
 	github.com/moby/moby/api v1.54.0
 	github.com/moby/moby/client v0.3.0
+	golang.org/x/crypto v0.58.0
 	google.golang.org/protobuf v1.36.9
 	tags.cncf.io/container-device-interface v1.1.0
 )
@@ -102,7 +103,6 @@ require (
 	go.opentelemetry.io/otel/sdk/metric v1.45.0 // indirect
 	go.opentelemetry.io/otel/trace v1.45.0 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
-	golang.org/x/crypto v0.58.0 // indirect
 	golang.org/x/net v0.62.0 // indirect
 	golang.org/x/sync v0.24.0 // indirect
 	golang.org/x/sys v0.49.0 // indirect

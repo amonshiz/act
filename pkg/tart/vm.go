@@ -57,6 +57,44 @@ type vm struct {
 	runCmd  *exec.Cmd
 	runDone chan struct{}
 	runErr  error
+	runTail tailBuffer
+}
+
+// tailBuffer keeps the last few lines written to it, so an error can say
+// why `tart run` exited.
+type tailBuffer struct {
+	mu    sync.Mutex
+	lines []string
+	part  string
+}
+
+const tailLines = 5
+
+func (t *tailBuffer) Write(p []byte) (int, error) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	s := t.part + string(p)
+	parts := strings.Split(s, "\n")
+	t.part = parts[len(parts)-1]
+	for _, l := range parts[:len(parts)-1] {
+		if l = strings.TrimSpace(l); l != "" {
+			t.lines = append(t.lines, l)
+		}
+	}
+	if len(t.lines) > tailLines {
+		t.lines = t.lines[len(t.lines)-tailLines:]
+	}
+	return len(p), nil
+}
+
+func (t *tailBuffer) String() string {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	lines := t.lines
+	if p := strings.TrimSpace(t.part); p != "" {
+		lines = append(append([]string(nil), lines...), p)
+	}
+	return strings.Join(lines, "; ")
 }
 
 func newVM(c *cli, name string) *vm {
@@ -121,8 +159,12 @@ func (v *vm) Run(dirs []sharedDir, opts runOptions, out io.Writer) error {
 	}
 	// Not tied to a caller context: the VM must outlive the call that starts it.
 	cmd := v.cli.command(context.Background(), args...)
-	cmd.Stdout = out
-	cmd.Stderr = out
+	if out == nil {
+		out = io.Discard
+	}
+	w := io.MultiWriter(out, &v.runTail)
+	cmd.Stdout = w
+	cmd.Stderr = w
 	if err := cmd.Start(); err != nil {
 		if errors.Is(err, exec.ErrNotFound) || errors.Is(err, fs.ErrNotExist) {
 			return fmt.Errorf("%w (%s)", ErrTartNotFound, v.cli.bin)
@@ -155,10 +197,14 @@ func (v *vm) exited() <-chan struct{} {
 func (v *vm) runExitErr() error {
 	v.mu.Lock()
 	defer v.mu.Unlock()
-	if v.runErr != nil {
-		return fmt.Errorf("`tart run` exited: %w", v.runErr)
+	msg := "`tart run` exited"
+	if tail := v.runTail.String(); tail != "" {
+		msg += " (" + tail + ")"
 	}
-	return errors.New("`tart run` exited")
+	if v.runErr != nil {
+		return fmt.Errorf("%s: %w", msg, v.runErr)
+	}
+	return errors.New(msg)
 }
 
 // IP runs `tart ip`, waiting up to wait seconds for the VM to boot. It

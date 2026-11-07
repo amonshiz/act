@@ -113,7 +113,7 @@ func TestVMIPFailsWhenRunExits(t *testing.T) {
 	require.NoError(t, v.Run(nil, runOptions{}, nil))
 	<-v.exited()
 	_, err := v.IP(ctx, "dhcp", 1)
-	assert.ErrorContains(t, err, "`tart run` exited")
+	assert.ErrorContains(t, err, "`tart run` exited (boot failed)")
 }
 
 func TestVMStopWithoutRunUsesTartStop(t *testing.T) {
@@ -121,4 +121,12 @@ func TestVMStopWithoutRunUsesTartStop(t *testing.T) {
 	v := newVM(newCLI(f.bin), "vm")
 	require.NoError(t, v.Stop(context.Background()))
 	assert.Equal(t, []string{"stop vm --timeout 10"}, f.calls(t))
+}
+
+func TestTailBuffer(t *testing.T) {
+	var b tailBuffer
+	_, _ = b.Write([]byte("one\ntwo\n\nthr"))
+	_, _ = b.Write([]byte("ee\nfour\nfive\nsix\npartial"))
+	assert.Equal(t, "three; four; five; six; partial", b.String()[len("two; "):])
+	assert.Equal(t, "two; three; four; five; six; partial", b.String())
 }

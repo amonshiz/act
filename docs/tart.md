@@ -38,16 +38,16 @@ Everything after `tart://` up to an optional `?` is passed to `tart clone`. It c
 
 Per-image options go in the URI query, for example `tart://ghcr.io/cirruslabs/macos-tahoe-xcode:latest?cpu=6&memory=12288`. Unknown options are an error.
 
-| Option          | Default       | Effect                                                                                                                                                   |
-| --------------- | ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `cpu`           | image default | `tart set --cpu` after cloning                                                                                                                           |
-| `memory`        | image default | `tart set --memory`, in megabytes                                                                                                                        |
-| `softnet`       | `0`           | `1` runs the VM with `--net-softnet` (see [Networking](#networking))                                                                                     |
-| `softnet_allow` | none          | Comma-separated CIDRs passed to `--net-softnet-allow`; implies `softnet=1`                                                                               |
-| `headless`      | `1`           | `0` opens a window so you can watch the VM                                                                                                               |
-| `pull`          | `0`           | `1` runs `tart pull` before cloning. `tart clone` already pulls a missing image; act's own `--pull` does not apply                                       |
-| `resolver`      | `dhcp`        | `tart ip --resolver`: `dhcp`, `arp` or `agent`                                                                                                           |
-| `transport`     | `ssh`         | `agent` runs commands with `tart exec`, which needs the Tart Guest Agent in the image. act falls back to SSH with a warning if the agent does not answer |
+| Option          | Default       | Effect                                                                                                                                                                                                                    |
+| --------------- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `cpu`           | image default | `tart set --cpu` after cloning                                                                                                                                                                                            |
+| `memory`        | image default | `tart set --memory`, in megabytes                                                                                                                                                                                         |
+| `softnet`       | `0`           | `1` runs the VM with `--net-softnet` (see [Networking](#networking))                                                                                                                                                      |
+| `softnet_allow` | none          | Comma-separated CIDRs passed to `--net-softnet-allow`; implies `softnet=1`                                                                                                                                                |
+| `headless`      | `1`           | `0` opens a window so you can watch the VM                                                                                                                                                                                |
+| `pull`          | `0`           | `1` runs `tart pull` before cloning. `tart clone` already pulls a missing image; act's own `--pull` does not apply                                                                                                        |
+| `resolver`      | `dhcp`        | `tart ip --resolver`: `dhcp`, `arp` or `agent`                                                                                                                                                                            |
+| `transport`     | `ssh`         | `agent` runs commands with `tart exec`, which needs the Tart Guest Agent in the image (the Cirrus Labs images have it) and adds roughly 0.2 s per step. act falls back to SSH with a warning if the agent does not answer |
 
 Host-wide settings and credentials are flags, so a project `.actrc` cannot set them:
 
@@ -82,7 +82,7 @@ JavaScript actions need `node` in the image. act warns at setup when the image h
   - `services:`: "service containers are only supported on Linux runners"
   - `uses: docker://...` and Dockerfile actions: "container actions are only supported on Linux runners"
 - `--container-architecture`, `--privileged` and `--container-options` are ignored for Tart platforms, with a warning.
-- The workspace lives on a virtiofs share, which is slower than the guest disk for builds that touch many files.
+- The workspace lives on a virtiofs share, which is slower than the guest disk for builds that touch many files. A small `swift build` took 11 s in the workspace and 6 s on the guest disk.
 
 ## Debugging a failed job
 
@@ -104,7 +104,7 @@ Under Tart's default shared (NAT) network, the VM can reach the internet and you
 -P macos-26=tart://ghcr.io/cirruslabs/macos-tahoe-xcode:latest?softnet_allow=192.168.1.62/32
 ```
 
-Use `ipconfig getifaddr en0` to find the address. Softnet needs Tart's `softnet` helper; see Tart's documentation.
+act logs the address its artifact and cache servers listen on at startup (for example `Start server on http://192.168.1.62:34567`). Softnet runs a helper as root, so it needs passwordless `sudo`; see Tart's documentation. Without it, the job fails at setup with an error from `tart run` such as "root privileges are required".
 
 ## Cleaning up
 

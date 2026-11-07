@@ -200,6 +200,7 @@ func (j *TestJobFileInfo) runTest(ctx context.Context, t *testing.T, cfg *Config
 		ContainerArchitecture: cfg.ContainerArchitecture,
 		Matrix:                cfg.Matrix,
 		ActionCache:           cfg.ActionCache,
+		Tart:                  cfg.Tart,
 	}
 
 	runner, err := New(runnerConfig)

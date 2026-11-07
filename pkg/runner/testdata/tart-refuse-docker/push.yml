@@ -1,0 +1,20 @@
+name: tart-refuse-docker
+on: push
+
+jobs:
+  docker-url:
+    runs-on: macos-26
+    steps:
+      - uses: docker://alpine:3
+  services:
+    runs-on: macos-26
+    services:
+      db:
+        image: postgres
+    steps:
+      - run: echo unreachable
+  container:
+    runs-on: macos-26
+    container: alpine:3
+    steps:
+      - run: echo unreachable

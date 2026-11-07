@@ -1,0 +1,34 @@
+name: tart-env-files
+on: push
+
+jobs:
+  produce:
+    runs-on: macos-26
+    outputs:
+      value: ${{ steps.out.outputs.value }}
+    steps:
+      - run: |
+          echo "FROM_ENV=hello world" >> "$GITHUB_ENV"
+          {
+            echo "MULTI<<EOF"
+            echo "line 1"
+            echo "line 2"
+            echo "EOF"
+          } >> "$GITHUB_ENV"
+          mkdir -p "$RUNNER_TEMP/bin"
+          printf '#!/bin/sh\necho tool-ran\n' > "$RUNNER_TEMP/bin/act-tart-tool"
+          chmod +x "$RUNNER_TEMP/bin/act-tart-tool"
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+      - run: |
+          set -e
+          [ "$FROM_ENV" = "hello world" ]
+          [ "$MULTI" = "$(printf 'line 1\nline 2')" ]
+          [ "$(act-tart-tool)" = tool-ran ]
+      - id: out
+        run: echo "value=42" >> "$GITHUB_OUTPUT"
+      - run: echo "state=saved" >> "$GITHUB_STATE"
+  consume:
+    needs: produce
+    runs-on: macos-26
+    steps:
+      - run: '[ "${{ needs.produce.outputs.value }}" = 42 ]'

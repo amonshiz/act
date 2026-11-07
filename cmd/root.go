@@ -32,6 +32,7 @@ import (
 	"github.com/nektos/act/pkg/gh"
 	"github.com/nektos/act/pkg/model"
 	"github.com/nektos/act/pkg/runner"
+	"github.com/nektos/act/pkg/tart"
 )
 
 type Flag struct {
@@ -131,6 +132,11 @@ func createRootCommand(ctx context.Context, input *Input, version string) *cobra
 	rootCmd.PersistentFlags().StringArrayVarP(&input.localRepository, "local-repository", "", []string{}, "Replaces the specified repository and ref with a local folder (e.g. https://github.com/test/test@v0=/home/act/test or test/test@v0=/home/act/test, the latter matches any hosts or protocols)")
 	rootCmd.PersistentFlags().BoolVar(&input.listOptions, "list-options", false, "Print a json structure of compatible options")
 	rootCmd.PersistentFlags().IntVar(&input.concurrentJobs, "concurrent-jobs", 0, "Maximum number of concurrent jobs to run. Default is the number of CPUs available.")
+	rootCmd.PersistentFlags().StringVar(&input.tartSSHUser, "tart-ssh-user", tart.DefaultSSHUser, "SSH user for tart:// platforms")
+	rootCmd.PersistentFlags().StringVar(&input.tartSSHPassword, "tart-ssh-password", "", "SSH password for tart:// platforms (default \"admin\", or $"+tartSSHPasswordEnv+")")
+	rootCmd.PersistentFlags().StringVar(&input.tartSSHKey, "tart-ssh-key", "", "private key file for SSH to tart:// platforms; used instead of the password")
+	rootCmd.PersistentFlags().IntVar(&input.tartMaxVMs, "tart-max-vms", tart.DefaultMaxVMs, "maximum number of Tart VMs act runs at once")
+	rootCmd.PersistentFlags().BoolVar(&input.tartKeepFailed, "tart-keep-failed", false, "keep the Tart VM of a failed job for debugging")
 	rootCmd.PersistentFlags().Bool(trustProjectActrcFlag, false, "Apply every flag in ./.actrc. Without it, ./.actrc may only set flags that do not reach host resources, and $VAR references in it are not expanded. Set it on the command line or in your user config.")
 	rootCmd.SetArgs(args(rootCmd))
 	return rootCmd
@@ -648,7 +654,9 @@ func newRunCommand(ctx context.Context, input *Input) func(*cobra.Command, []str
 			Matrix:                             matrixes,
 			ContainerNetworkMode:               docker_container.NetworkMode(input.networkName),
 			ConcurrentJobs:                     input.concurrentJobs,
+			Tart:                               input.tartHostConfig(),
 		}
+		warnIgnoredForTart(input, config.Platforms)
 		if input.useNewActionCache || len(input.localRepository) > 0 {
 			if input.actionOfflineMode {
 				config.ActionCache = &runner.GoGitActionCacheOfflineMode{

@@ -29,6 +29,7 @@ import (
 	"github.com/nektos/act/pkg/container"
 	"github.com/nektos/act/pkg/exprparser"
 	"github.com/nektos/act/pkg/model"
+	"github.com/nektos/act/pkg/tart"
 )
 
 // RunContext contains info about current job
@@ -186,34 +187,55 @@ func (rc *RunContext) GetBindsAndMounts() ([]string, map[string]string) {
 	return binds, mounts
 }
 
+// jobDirs are the per-job host directories used by the host and Tart
+// backends.
+type jobDirs struct {
+	root string // <ActionCacheDir>/<random>
+	act  string // root/act
+	work string // root/hostexecutor
+	tmp  string // root/tmp
+}
+
+func (rc *RunContext) newJobDirs() (jobDirs, error) {
+	randBytes := make([]byte, 8)
+	_, _ = rand.Read(randBytes)
+	root := filepath.Join(rc.ActionCacheDir(), hex.EncodeToString(randBytes))
+	d := jobDirs{
+		root: root,
+		act:  filepath.Join(root, "act"),
+		work: filepath.Join(root, "hostexecutor"),
+		tmp:  filepath.Join(root, "tmp"),
+	}
+	for _, p := range []string{d.act, d.work, d.tmp} {
+		if err := os.MkdirAll(p, 0o777); err != nil {
+			return d, err
+		}
+	}
+	return d, nil
+}
+
+// newStepLogWriter returns the writer step output goes to.
+func (rc *RunContext) newStepLogWriter(ctx context.Context) io.Writer {
+	rawLogger := common.Logger(ctx).WithField("raw_output", true)
+	return common.NewLineWriter(rc.commandHandler(ctx), func(s string) bool {
+		if rc.Config.LogOutput {
+			rawLogger.Infof("%s", s)
+		} else {
+			rawLogger.Debugf("%s", s)
+		}
+		return true
+	})
+}
+
 func (rc *RunContext) startHostEnvironment() common.Executor {
 	return func(ctx context.Context) error {
-		logger := common.Logger(ctx)
-		rawLogger := logger.WithField("raw_output", true)
-		logWriter := common.NewLineWriter(rc.commandHandler(ctx), func(s string) bool {
-			if rc.Config.LogOutput {
-				rawLogger.Infof("%s", s)
-			} else {
-				rawLogger.Debugf("%s", s)
-			}
-			return true
-		})
+		logWriter := rc.newStepLogWriter(ctx)
 		cacheDir := rc.ActionCacheDir()
-		randBytes := make([]byte, 8)
-		_, _ = rand.Read(randBytes)
-		miscpath := filepath.Join(cacheDir, hex.EncodeToString(randBytes))
-		actPath := filepath.Join(miscpath, "act")
-		if err := os.MkdirAll(actPath, 0o777); err != nil {
+		dirs, err := rc.newJobDirs()
+		if err != nil {
 			return err
 		}
-		path := filepath.Join(miscpath, "hostexecutor")
-		if err := os.MkdirAll(path, 0o777); err != nil {
-			return err
-		}
-		runnerTmp := filepath.Join(miscpath, "tmp")
-		if err := os.MkdirAll(runnerTmp, 0o777); err != nil {
-			return err
-		}
+		miscpath, actPath, path, runnerTmp := dirs.root, dirs.act, dirs.work, dirs.tmp
 		toolCache := filepath.Join(cacheDir, "tool_cache")
 		rc.JobContainer = &container.HostEnvironment{
 			Path:      path,
@@ -712,14 +734,6 @@ func (b jobBackend) String() string {
 	}
 }
 
-// tartScheme prefixes platform images that run in a Tart VM.
-const tartScheme = "tart://"
-
-// isTartPlatform reports whether a -P image value selects the Tart backend.
-func isTartPlatform(image string) bool {
-	return len(image) >= len(tartScheme) && strings.EqualFold(image[:len(tartScheme)], tartScheme)
-}
-
 // backend resolves which backend runs the job. A tart:// platform wins and
 // refuses container: like GitHub-hosted macOS runners do; otherwise a job
 // container means Docker, -self-hosted means the host, and anything else
@@ -727,7 +741,7 @@ func isTartPlatform(image string) bool {
 func (rc *RunContext) backend(ctx context.Context) (jobBackend, error) {
 	platform := rc.runsOnImage(ctx)
 	image := rc.containerImage(ctx)
-	if isTartPlatform(platform) {
+	if tart.HasScheme(platform) {
 		if image != "" {
 			return backendTart, errors.New("container jobs are only supported on Linux runners")
 		}
@@ -1198,6 +1212,13 @@ func (rc *RunContext) withGithubEnv(ctx context.Context, github *model.GithubCon
 				platformName = strings.SplitN(strings.Replace(platformName, `-`, ``, 1), `.`, 2)[0]
 				env["ImageOS"] = platformName
 			}
+		}
+	}
+	// A backend that knows the guest OS (Tart) reports it directly, so
+	// macos-latest still yields a real version such as macos26.
+	if p, ok := rc.JobContainer.(interface{ ImageOS() string }); ok {
+		if imageOS := p.ImageOS(); imageOS != "" {
+			env["ImageOS"] = imageOS
 		}
 	}
 

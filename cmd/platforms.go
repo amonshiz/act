@@ -13,9 +13,9 @@ func (i *Input) newPlatforms() map[string]string {
 	}
 
 	for _, p := range i.platforms {
-		pParts := strings.Split(p, "=")
-		if len(pParts) == 2 {
-			platforms[strings.ToLower(pParts[0])] = pParts[1]
+		// Split on the first = only: images such as tart://img?cpu=4 contain more.
+		if label, image, ok := strings.Cut(p, "="); ok && label != "" {
+			platforms[strings.ToLower(label)] = image
 		}
 	}
 	return platforms

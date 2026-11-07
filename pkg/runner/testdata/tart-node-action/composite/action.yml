@@ -1,0 +1,16 @@
+name: composite
+description: a composite action with a hyphenated input
+inputs:
+  node-version:
+    description: a version
+    required: true
+outputs:
+  version:
+    description: the version with a v prefix
+    value: ${{ steps.v.outputs.version }}
+runs:
+  using: composite
+  steps:
+    - id: v
+      shell: bash
+      run: echo "version=v${{ inputs.node-version }}" >> "$GITHUB_OUTPUT"

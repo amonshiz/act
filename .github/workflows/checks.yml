@@ -245,7 +245,13 @@ jobs:
             --junitfile unit-tests.xml \
             --format pkgname \
             --packages=./... \
-            -- -v -cover -coverpkg=./... -coverprofile=coverage.txt -covermode=atomic -timeout 20m -run '^TestRunEventHostEnvironment$'
+            -- -v -cover -coverpkg=./... -coverprofile=coverage.txt -covermode=atomic -timeout 20m -run '^(TestRunEventHostEnvironment|TestRunEventTart)$'
+        shell: bash
+      - name: Run Tart Tests
+        if: needs.changes.outputs.heavy == 'true'
+        # The Tart backend's unit tests use a fake tart CLI and an in-process
+        # SSH server; on macOS they also exercise /bin/zsh and sw_vers.
+        run: go test -race -timeout 10m ./pkg/tart/... ./internal/...
         shell: bash
       - name: Test Summary
         uses: test-summary/action@31493c76ec9e7aa675f1585d3ed6f1da69269a86 # v2.4

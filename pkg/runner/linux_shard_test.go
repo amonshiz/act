@@ -48,6 +48,7 @@ var linuxShardOverride = map[string]int{
 	"TestRunEvent/set-env-step-env-override":                    0,
 	"TestRunEvent/services-empty-image":                         0,
 	"TestRunEventHostEnvironment":                               1,
+	"TestRunEventTart":                                          2,
 	"TestRunEvent/checkout":                                     1,
 	"TestRunEvent/remote-action-composite-js-pre-with-defaults": 1,
 	"TestPullAndPostStepFailureIsJobFailure":                    1,

@@ -18,7 +18,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/nektos/act/pkg/tart/internal/sshtest"
+	"github.com/nektos/act/internal/sshtest"
 )
 
 // syncBuffer is a goroutine-safe bytes.Buffer.

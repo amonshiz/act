@@ -1,0 +1,12 @@
+name: hello
+description: greets someone from a JavaScript action
+inputs:
+  who-to-greet:
+    description: who to greet
+    required: true
+outputs:
+  greeting:
+    description: the greeting
+runs:
+  using: node20
+  main: index.js

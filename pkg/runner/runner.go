@@ -12,6 +12,7 @@ import (
 
 	"github.com/nektos/act/pkg/common"
 	"github.com/nektos/act/pkg/model"
+	"github.com/nektos/act/pkg/tart"
 )
 
 // Runner provides capabilities to run GitHub actions
@@ -65,6 +66,7 @@ type Config struct {
 	ContainerNetworkMode               docker_container.NetworkMode // the network mode of job containers (the value of --network)
 	ActionCache                        ActionCache                  // Use a custom ActionCache Implementation
 	ConcurrentJobs                     int                          // Number of max concurrent jobs
+	Tart                               tart.HostConfig              // settings for tart:// platforms
 }
 
 func (config *Config) GetConcurrentJobs() int {

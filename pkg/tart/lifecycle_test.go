@@ -14,8 +14,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/nektos/act/internal/sshtest"
 	"github.com/nektos/act/pkg/common"
-	"github.com/nektos/act/pkg/tart/internal/sshtest"
 )
 
 type lifecycleFixture struct {

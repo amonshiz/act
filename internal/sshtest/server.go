@@ -25,12 +25,12 @@ import (
 type Server struct {
 	User     string
 	Password string
-	Env      []string // environment of commands; nil inherits the test's
 
 	listener net.Listener
 	config   *ssh.ServerConfig
 
 	mu       sync.Mutex
+	env      []string // environment of commands; nil inherits the test's
 	conns    map[net.Conn]struct{}
 	commands []string
 	wg       sync.WaitGroup
@@ -76,6 +76,14 @@ func (s *Server) Port() int {
 	_, p, _ := net.SplitHostPort(s.Addr())
 	n, _ := strconv.Atoi(p)
 	return n
+}
+
+// SetEnv sets the environment commands run with, like the minimal
+// environment sshd gives a session. nil inherits the test's environment.
+func (s *Server) SetEnv(env []string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.env = env
 }
 
 // Commands returns every exec request received so far.
@@ -171,7 +179,9 @@ func (s *Server) handleSession(ch ssh.Channel, reqs <-chan *ssh.Request) {
 
 func (s *Server) run(ch ssh.Channel, command string) {
 	cmd := exec.Command("/bin/sh", "-c", command)
-	cmd.Env = s.Env
+	s.mu.Lock()
+	cmd.Env = s.env
+	s.mu.Unlock()
 	cmd.Stdin = ch
 	cmd.Stdout = ch
 	cmd.Stderr = ch.Stderr()

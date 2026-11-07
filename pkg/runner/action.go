@@ -251,6 +251,9 @@ func removeGitIgnore(ctx context.Context, directory string) error {
 func execAsDocker(ctx context.Context, step actionStep, actionName, basedir, subpath string, localAction bool, entrypointType string) error {
 	logger := common.Logger(ctx)
 	rc := step.getRunContext()
+	if rc.runsInTart() {
+		return fmt.Errorf("%s: %w", actionName, errTartContainerActions)
+	}
 	action := step.getActionModel()
 
 	var prepImage common.Executor

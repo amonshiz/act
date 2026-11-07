@@ -1,0 +1,18 @@
+name: tart-node-action
+on: push
+
+jobs:
+  actions:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+      - id: hello
+        uses: ./tart-node-action/hello
+        with:
+          who-to-greet: Mona
+      - run: '[ "${{ steps.hello.outputs.greeting }}" = "Hello Mona" ]'
+      - id: composite
+        uses: ./tart-node-action/composite
+        with:
+          node-version: "20"
+      - run: '[ "${{ steps.composite.outputs.version }}" = "v20" ]'

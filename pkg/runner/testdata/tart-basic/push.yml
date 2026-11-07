@@ -1,0 +1,39 @@
+name: tart-basic
+on: push
+
+jobs:
+  basic:
+    runs-on: macos-26
+    steps:
+      - name: runner environment
+        run: |
+          set -e
+          echo "os=$RUNNER_OS arch=$RUNNER_ARCH imageos=$ImageOS"
+          [ "$RUNNER_OS" = macOS ]
+          [ -n "$RUNNER_ARCH" ]
+          [ -n "$ImageOS" ]
+          case "$GITHUB_WORKSPACE" in */act/work) ;; *) echo "unexpected workspace $GITHUB_WORKSPACE"; exit 1 ;; esac
+          [ "$(pwd)" = "$GITHUB_WORKSPACE" ]
+          case "$RUNNER_TEMP" in */act/tmp) ;; *) echo "unexpected temp $RUNNER_TEMP"; exit 1 ;; esac
+          case "$RUNNER_TOOL_CACHE" in */hostedtoolcache) ;; *) echo "unexpected tool cache $RUNNER_TOOL_CACHE"; exit 1 ;; esac
+          [ -d "$RUNNER_TOOL_CACHE" ]
+          [ -f "$GITHUB_EVENT_PATH" ]
+          # The host environment is not copied into the job.
+          [ -z "${ACT_TART_HOST_ONLY:-}" ]
+      - name: default shell is bash
+        run: '[ -n "$BASH_VERSION" ]'
+      - name: env values reach the step intact
+        env:
+          GREETING: it's "quoted" $HOME `x`
+        run: |
+          [ "$GREETING" = 'it'"'"'s "quoted" $HOME `x`' ]
+      - name: sh shell
+        shell: sh
+        run: test -n "$GITHUB_WORKSPACE"
+      - run: mkdir -p sub
+      - name: working directory
+        working-directory: sub
+        run: '[ "$(basename "$PWD")" = sub ]'
+      - name: failing step that may fail
+        continue-on-error: true
+        run: exit 3

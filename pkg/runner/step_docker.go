@@ -60,6 +60,9 @@ func (sd *stepDocker) runUsesContainer() common.Executor {
 	step := sd.Step
 
 	return func(ctx context.Context) error {
+		if rc.runsInTart() {
+			return fmt.Errorf("%s: %w", step.Uses, errTartContainerActions)
+		}
 		image := strings.TrimPrefix(step.Uses, "docker://")
 		eval := rc.NewExpressionEvaluator(ctx)
 		cmd, err := shellquote.Split(eval.Interpolate(ctx, step.With["args"]))

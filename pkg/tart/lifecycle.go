@@ -173,6 +173,27 @@ func (e *Environment) prepareHost(ctx context.Context) error {
 
 func (e *Environment) connect(ctx context.Context, v *vm) error {
 	logger := common.Logger(ctx)
+	if e.opts.Transport == TransportAgent {
+		err := probeAgent(ctx, e.cli, v)
+		if err == nil {
+			logger.Debugf("tart: using tart exec for VM %s", v.name)
+			e.mu.Lock()
+			e.transport = &agentTransport{cli: e.cli, vm: v.name}
+			e.mu.Unlock()
+			return nil
+		}
+		if done := v.exited(); done != nil {
+			select {
+			case <-done:
+				return v.runExitErr()
+			default:
+			}
+		}
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		logger.Warnf("The Tart Guest Agent in VM %s did not answer (%v); falling back to SSH", v.name, err)
+	}
 	ip, err := v.IP(ctx, e.opts.Resolver, ipWaitSeconds)
 	if err != nil {
 		return err

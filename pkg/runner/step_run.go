@@ -3,14 +3,12 @@ package runner
 import (
 	"context"
 	"fmt"
-	"runtime"
 	"strings"
 
 	"github.com/kballard/go-shellquote"
 
 	"github.com/nektos/act/pkg/common"
 	"github.com/nektos/act/pkg/container"
-	"github.com/nektos/act/pkg/lookpath"
 	"github.com/nektos/act/pkg/model"
 )
 
@@ -35,8 +33,8 @@ func (sr *stepRun) main() common.Executor {
 		sr.setupShellCommandExecutor(),
 		func(ctx context.Context) error {
 			sr.getRunContext().ApplyExtraPath(ctx, &sr.env)
-			if he, ok := sr.getRunContext().JobContainer.(*container.HostEnvironment); ok && he != nil {
-				return he.ExecWithCmdLine(sr.cmd, sr.cmdline, sr.env, "", sr.WorkingDirectory)(ctx)
+			if ce, ok := sr.getRunContext().JobContainer.(container.CmdLineExecutor); ok && ce != nil {
+				return ce.ExecWithCmdLine(sr.cmd, sr.cmdline, sr.env, "", sr.WorkingDirectory)(ctx)
 			}
 			return sr.getRunContext().JobContainer.Exec(sr.cmd, sr.env, "", sr.WorkingDirectory)(ctx)
 		},
@@ -145,22 +143,6 @@ func (sr *stepRun) setupShellCommand(ctx context.Context) (name, script string, 
 	return name, script, err
 }
 
-type localEnv struct {
-	env map[string]string
-}
-
-func (l *localEnv) Getenv(name string) string {
-	if runtime.GOOS == "windows" {
-		for k, v := range l.env {
-			if strings.EqualFold(name, k) {
-				return v
-			}
-		}
-		return ""
-	}
-	return l.env[name]
-}
-
 func (sr *stepRun) setupShell(ctx context.Context) {
 	rc := sr.RunContext
 	step := sr.Step
@@ -178,22 +160,13 @@ func (sr *stepRun) setupShell(ctx context.Context) {
 	}
 
 	if step.WorkflowShell == "" {
-		if _, ok := rc.JobContainer.(*container.HostEnvironment); ok {
-			shellWithFallback := []string{"bash", "sh"}
-			// Don't use bash on windows by default, if not using a docker container
-			if runtime.GOOS == "windows" {
-				shellWithFallback = []string{"pwsh", "powershell"}
-			}
-			step.Shell = shellWithFallback[0]
-			lenv := &localEnv{env: map[string]string{}}
+		if sp, ok := rc.JobContainer.(container.DefaultShellProvider); ok {
+			env := map[string]string{}
 			for k, v := range sr.env {
-				lenv.env[k] = v
+				env[k] = v
 			}
-			sr.getRunContext().ApplyExtraPath(ctx, &lenv.env)
-			_, err := lookpath.LookPath2(shellWithFallback[0], lenv)
-			if err != nil {
-				step.Shell = shellWithFallback[1]
-			}
+			rc.ApplyExtraPath(ctx, &env)
+			step.Shell = sp.DefaultShell(env)
 		} else if containerImage := rc.containerImage(ctx); containerImage != "" {
 			// Currently only linux containers are supported, use sh by default like actions/runner
 			step.Shell = "sh"

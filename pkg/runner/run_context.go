@@ -674,17 +674,78 @@ func (rc *RunContext) startContainer() common.Executor {
 	return func(ctx context.Context) error {
 		ctx, cancel := common.EarlyCancelContext(ctx)
 		defer cancel()
-		if rc.IsHostEnv(ctx) {
-			return rc.startHostEnvironment()(ctx)
+		backend, err := rc.backend(ctx)
+		if err != nil {
+			return err
 		}
-		return rc.startJobContainer()(ctx)
+		switch backend {
+		case backendHost:
+			return rc.startHostEnvironment()(ctx)
+		case backendTart:
+			return rc.startTartEnvironment()(ctx)
+		default:
+			return rc.startJobContainer()(ctx)
+		}
 	}
 }
 
-func (rc *RunContext) IsHostEnv(ctx context.Context) bool {
+// jobBackend is where the steps of a job run.
+type jobBackend int
+
+const (
+	// backendDocker runs the job in a Docker container.
+	backendDocker jobBackend = iota
+	// backendHost runs the job directly on the host (-self-hosted).
+	backendHost
+	// backendTart runs the job in a throwaway macOS VM managed by Tart.
+	backendTart
+)
+
+func (b jobBackend) String() string {
+	switch b {
+	case backendHost:
+		return "host"
+	case backendTart:
+		return "tart"
+	default:
+		return "docker"
+	}
+}
+
+// tartScheme prefixes platform images that run in a Tart VM.
+const tartScheme = "tart://"
+
+// isTartPlatform reports whether a -P image value selects the Tart backend.
+func isTartPlatform(image string) bool {
+	return len(image) >= len(tartScheme) && strings.EqualFold(image[:len(tartScheme)], tartScheme)
+}
+
+// backend resolves which backend runs the job. A tart:// platform wins and
+// refuses container: like GitHub-hosted macOS runners do; otherwise a job
+// container means Docker, -self-hosted means the host, and anything else
+// means Docker.
+func (rc *RunContext) backend(ctx context.Context) (jobBackend, error) {
 	platform := rc.runsOnImage(ctx)
 	image := rc.containerImage(ctx)
-	return image == "" && strings.EqualFold(platform, "-self-hosted")
+	if isTartPlatform(platform) {
+		if image != "" {
+			return backendTart, errors.New("container jobs are only supported on Linux runners")
+		}
+		return backendTart, nil
+	}
+	if image != "" {
+		return backendDocker, nil
+	}
+	if strings.EqualFold(platform, "-self-hosted") {
+		return backendHost, nil
+	}
+	return backendDocker, nil
+}
+
+// IsHostEnv reports whether the job runs directly on the host.
+func (rc *RunContext) IsHostEnv(ctx context.Context) bool {
+	b, err := rc.backend(ctx)
+	return err == nil && b == backendHost
 }
 
 func (rc *RunContext) stopContainer() common.Executor {

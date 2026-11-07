@@ -479,6 +479,26 @@ func (e *HostEnvironment) ReplaceLogWriter(stdout io.Writer, _ io.Writer) (io.Wr
 	return org, org
 }
 
+// DefaultShell returns bash, falling back to sh when bash is not on PATH.
+// On Windows it returns pwsh, falling back to powershell.
+func (*HostEnvironment) DefaultShell(env map[string]string) string {
+	shellWithFallback := []string{"bash", "sh"}
+	// Don't use bash on windows by default, if not using a docker container
+	if runtime.GOOS == "windows" {
+		shellWithFallback = []string{"pwsh", "powershell"}
+	}
+	if _, err := lookpath.LookPath2(shellWithFallback[0], &localEnv{env: env}); err != nil {
+		return shellWithFallback[1]
+	}
+	return shellWithFallback[0]
+}
+
 func (*HostEnvironment) IsEnvironmentCaseInsensitive() bool {
 	return runtime.GOOS == "windows"
 }
+
+var (
+	_ ExecutionsEnvironment = (*HostEnvironment)(nil)
+	_ CmdLineExecutor       = (*HostEnvironment)(nil)
+	_ DefaultShellProvider  = (*HostEnvironment)(nil)
+)

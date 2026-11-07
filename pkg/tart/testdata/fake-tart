@@ -30,6 +30,10 @@ clone)
 pull | set) ;;
 run)
 	name=
+	# Install the trap first: bash ignores a SIGINT that arrives while it
+	# waits for a foreground child unless a trap is set.
+	trap '[ -n "$name" ] && setstate "$name" stopped; rm -f "$state/vms/$name/pid"; exit 0' INT TERM
+	mkdir -p "${FAKE_TART_MOUNT:?}"
 	while [ $# -gt 0 ]; do
 		case "$1" in
 		--dir)
@@ -50,7 +54,6 @@ run)
 	[ -n "${FAKE_TART_RUN_EXIT:-}" ] && { echo "boot failed" >&2; exit 1; }
 	setstate "$name" running
 	echo $$ > "$state/vms/$name/pid"
-	trap 'setstate "$name" stopped; rm -f "$state/vms/$name/pid"; exit 0' INT TERM
 	while :; do sleep 1 & wait $!; done
 	;;
 ip)

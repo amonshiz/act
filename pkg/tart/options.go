@@ -161,6 +161,9 @@ type HostConfig struct {
 	// SkipPlatformCheck allows running on hosts other than macOS on Apple
 	// Silicon (tests).
 	SkipPlatformCheck bool
+	// SkipMount assumes the shares are already visible under the guest
+	// mount point instead of running mount_virtiofs (tests).
+	SkipMount bool
 }
 
 const (

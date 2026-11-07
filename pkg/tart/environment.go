@@ -2,7 +2,6 @@ package tart
 
 import (
 	"context"
-	"errors"
 	"io"
 	"path"
 	"strings"
@@ -24,6 +23,8 @@ type Config struct {
 	Host HostConfig
 	// Stdout receives step output.
 	Stdout io.Writer
+	// RunLog receives the output of `tart run`; nil discards it.
+	RunLog io.Writer
 }
 
 // Environment runs a job in a Tart VM. File operations happen on the host
@@ -40,10 +41,21 @@ type Environment struct {
 	// ExecWithCmdLine) are promoted onto Environment.
 	files *container.HostEnvironment
 
+	name    string // VM name prefix
+	cli     *cli
+	limiter *limiter
+	runLog  io.Writer
+
 	mu        sync.Mutex
 	stdout    io.Writer
 	transport transport
 	loginEnv  map[string]string
+	guest     guestFacts
+	vm        *vm
+	cloned    bool
+	slot      *slot
+	state     lifecycleState
+	finish    sync.Once
 }
 
 // New validates the platform and returns an Environment that is not started.
@@ -57,12 +69,20 @@ func New(c Config) (*Environment, error) {
 	if home == "" {
 		home = path.Join("/Users", host.SSHUser)
 	}
+	runLog := c.RunLog
+	if runLog == nil {
+		runLog = io.Discard
+	}
 	e := &Environment{
-		cfg:    host,
-		opts:   opts,
-		dirs:   c.Dirs,
-		paths:  newPathMap(c.Dirs, home),
-		stdout: c.Stdout,
+		cfg:     host,
+		opts:    opts,
+		dirs:    c.Dirs,
+		paths:   newPathMap(c.Dirs, home),
+		stdout:  c.Stdout,
+		name:    c.Name,
+		cli:     newCLI(host.TartBinary),
+		limiter: sharedLimiter(host.MaxVMs),
+		runLog:  runLog,
 	}
 	e.files = &container.HostEnvironment{
 		Path:      c.Dirs.Work,
@@ -148,32 +168,8 @@ func (*Environment) IsEnvironmentCaseInsensitive() bool { return false }
 // DefaultShell is bash, as on GitHub's macOS runners.
 func (*Environment) DefaultShell(map[string]string) string { return "bash" }
 
-// --- lifecycle and exec; implemented in later changes ---
-
-var errNotImplemented = errors.New("tart: not implemented yet")
-
-func (e *Environment) Pull(bool) common.Executor                 { return errorExecutor(nil) }
-func (e *Environment) Create([]string, []string) common.Executor { return errorExecutor(nil) }
-func (e *Environment) Start(bool) common.Executor                { return errorExecutor(errNotImplemented) }
 func (e *Environment) ExecWithCmdLine(command []string, _ string, env map[string]string, user, workdir string) common.Executor {
 	return e.Exec(command, env, user, workdir)
-}
-func (e *Environment) UpdateFromImageEnv(*map[string]string) common.Executor {
-	return errorExecutor(nil)
-}
-func (e *Environment) Remove() common.Executor     { return errorExecutor(nil) }
-func (e *Environment) Close() common.Executor      { return errorExecutor(nil) }
-func (e *Environment) DefaultPathVariable() string { return defaultPath }
-func (e *Environment) GetRunnerContext(context.Context) map[string]interface{} {
-	return map[string]interface{}{"os": "macOS", "arch": "ARM64", "temp": e.paths.tmpPath(), "tool_cache": e.paths.toolCache()}
-}
-func (e *Environment) GetHealth(context.Context) container.Health { return container.HealthStarting }
-func (e *Environment) ReplaceLogWriter(stdout, _ io.Writer) (io.Writer, io.Writer) {
-	e.mu.Lock()
-	defer e.mu.Unlock()
-	org := e.stdout
-	e.stdout = stdout
-	return org, org
 }
 
 // defaultPath is the PATH used when the guest login environment has none.

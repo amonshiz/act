@@ -181,11 +181,13 @@ func (v *vm) IP(ctx context.Context, resolver string, wait int) (string, error) 
 	}
 	out, _, err := v.cli.run(ctx, args...)
 	if err != nil {
+		// A VM that failed to boot makes `tart ip` fail too; prefer the
+		// clearer error when `tart run` exits shortly after.
 		if done := v.exited(); done != nil {
 			select {
 			case <-done:
 				return "", v.runExitErr()
-			default:
+			case <-time.After(2 * time.Second):
 			}
 		}
 		return "", err
